@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>谜题解密</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PapaParse 用于解析 Google Sheet 的 CSV -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-6">
+    <div class="text-center space-y-2">
+      <h1 class="text-2xl font-bold tracking-wide text-indigo-400">🔒 密码锁</h1>
+      <p class="text-xs text-slate-400">请输入密码以查看解密内容</p>
+    </div>
+
+    <!-- 加载中提示 -->
+    <div id="loading" class="text-center py-4 text-slate-400 text-sm">
+      正在连接数据库，请稍候...
+    </div>
+
+    <!-- 主交互区域 -->
+    <div id="main-form" class="space-y-4 hidden">
+      <div>
+        <label for="password-input" class="block text-sm font-medium text-slate-300 mb-1">输入解锁密码</label>
+        <input type="text" id="password-input" placeholder="请输入密码..." 
+               class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-100 placeholder-slate-500 transition">
+      </div>
+
+      <button id="unlock-btn" onclick="verifyPassword()" 
+              class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 font-semibold rounded-xl transition text-white shadow-lg shadow-indigo-600/30">
+        确认解锁
+      </button>
+
+      <!-- 提示信息区域 -->
+      <div id="hint-box" class="hidden p-3 bg-slate-900/50 border border-slate-700/50 rounded-xl text-xs text-amber-400">
+        💡 提示：<span id="hint-text"></span>
+      </div>
+
+      <!-- 错误提示 -->
+      <div id="error-msg" class="hidden text-center text-sm text-red-400 font-medium">
+        密码错误，请重试！
+      </div>
+    </div>
+
+    <!-- 文字解密展示区域 -->
+    <div id="result-box" class="hidden space-y-4">
+      <div class="p-4 bg-slate-900 border border-indigo-500/30 rounded-xl">
+        <h2 class="text-xs uppercase tracking-wider text-indigo-400 font-bold mb-2">解密信息：</h2>
+        <p id="content-text" class="text-slate-200 text-base leading-relaxed whitespace-pre-wrap break-words"></p>
+      </div>
+
+      <button onclick="location.reload()" 
+              class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-xs font-medium rounded-lg text-slate-300 transition">
+        重新输入
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // 1. 替换为您在 Google Sheets 获得的 CSV 发布链接
+    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vXXXXX/pub?output=csv";
+
+    let sheetData = [];
+    let currentId = null;
+
+    // 初始化页面：解析 URL 中的 id 参数并拉取表格数据
+    window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentId = urlParams.get('id');
+
+      Papa.parse(SHEET_CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          sheetData = results.data;
+          document.getElementById('loading').classList.add('hidden');
+          document.getElementById('main-form').classList.remove('hidden');
+
+          // 如果 URL 包含 id，自动检查是否有对应的提示
+          if (currentId) {
+            const item = sheetData.find(row => row.id === currentId);
+            if (item && item.hint) {
+              document.getElementById('hint-text').innerText = item.hint;
+              document.getElementById('hint-box').classList.remove('hidden');
+            }
+          }
+        },
+        error: function(err) {
+          document.getElementById('loading').innerText = "加载数据库失败，请检查 CSV 链接。";
+        }
+      });
+    };
+
+    // 验证密码
+    function verifyPassword() {
+      const inputPass = document.getElementById('password-input').value.trim();
+      const errorMsg = document.getElementById('error-msg');
+
+      if (!inputPass) return;
+
+      // 在数据中匹配：若 URL 指定了 id 则匹配 id+密码，否则全局匹配密码
+      let match = null;
+      if (currentId) {
+        match = sheetData.find(row => row.id === currentId && row.password === inputPass);
+      } else {
+        match = sheetData.find(row => row.password === inputPass);
+      }
+
+      if (match) {
+        errorMsg.classList.add('hidden');
+        document.getElementById('main-form').classList.add('hidden');
+        
+        // 显示文本内容
+        document.getElementById('content-text').innerText = match.content;
+        document.getElementById('result-box').classList.remove('hidden');
+      } else {
+        errorMsg.classList.remove('hidden');
+      }
+    }
+
+    // 支持按 Enter 键提交
+    document.getElementById('password-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') verifyPassword();
+    });
+  </script>
+</body>
+</html>
